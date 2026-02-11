@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>App Evangelismo Igreja</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      width: 95%;
+      max-width: 450px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: none;
+      border-radius: 8px;
+      background: #2a5298;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1e3c72;
+    }
+
+    .secondary {
+      background: #888;
+    }
+
+    .secondary:hover {
+      background: #555;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    .divider {
+      margin: 20px 0;
+      border-top: 1px solid #ddd;
+    }
+
+    .highlight {
+      background: #f1f5ff;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+
+    <div id="loginArea">
+      <h2>Login</h2>
+      <input id="email" placeholder="Email">
+      <input id="senha" type="password" placeholder="Senha">
+      <button onclick="login()">Entrar</button>
+      <button class="secondary" onclick="registrar()">Criar Conta</button>
+    </div>
+
+    <div id="app" style="display:none;">
+      <h2>Painel de Evangelismo</h2>
+
+      <div class="divider"></div>
+
+      <h3>Presença no Evangelismo</h3>
+      <button onclick="registrarPresenca()">Registrar Presença Hoje</button>
+      <div class="highlight" id="totalPresencas"></div>
+
+      <div class="divider"></div>
+
+      <h3>Registrar Pessoa</h3>
+      <input id="nomePessoa" placeholder="Nome da pessoa">
+      <input id="telefonePessoa" placeholder="Telefone">
+      <label>
+        <input type="checkbox" id="decisao">
+        Decidiu por Cristo?
+      </label>
+      <button onclick="salvar()">Salvar Registro</button>
+
+      <div class="divider"></div>
+
+      <h3>Meus Registros</h3>
+      <ul id="lista"></ul>
+
+      <div class="divider"></div>
+      <button class="secondary" onclick="logout()">Sair</button>
+    </div>
+
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAFjZ0qQ5I47vuVndbGXz3RnMgv0HXkMgI",
+    authDomain: "mapa-f1db0.firebaseapp.com",
+    projectId: "mapa-f1db0",
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  window.login = async () => {
+    const email = document.getElementById("email").value;
+    const senha = document.getElementById("senha").value;
+    await signInWithEmailAndPassword(auth, email, senha);
+  };
+
+  window.registrar = async () => {
+    const email = document.getElementById("email").value;
+    const senha = document.getElementById("senha").value;
+    await createUserWithEmailAndPassword(auth, email, senha);
+  };
+
+  window.logout = async () => {
+    await signOut(auth);
+  };
+
+  window.salvar = async () => {
+    const nome = document.getElementById("nomePessoa").value;
+    const telefone = document.getElementById("telefonePessoa").value;
+    const decisao = document.getElementById("decisao").checked;
+
+    await addDoc(collection(db, "evangelismos"), {
+      userId: auth.currentUser.uid,
+      nome,
+      telefone,
+      decisao,
+      data: new Date()
+    });
+
+    carregarRegistros();
+    alert("Registro salvo!");
+  };
+
+  window.registrarPresenca = async () => {
+    await addDoc(collection(db, "presencas"), {
+      userId: auth.currentUser.uid,
+      data: new Date().toLocaleDateString(),
+      timestamp: new Date()
+    });
+
+    carregarPresencas();
+    alert("Presença registrada!");
+  };
+
+  async function carregarRegistros() {
+    const q = query(
+      collection(db, "evangelismos"),
+      where("userId", "==", auth.currentUser.uid)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const lista = document.getElementById("lista");
+    lista.innerHTML = "";
+
+    querySnapshot.forEach((doc) => {
+      const li = document.createElement("li");
+      li.textContent = doc.data().nome + " - " + doc.data().telefone;
+      lista.appendChild(li);
+    });
+  }
+
+  async function carregarPresencas() {
+    const q = query(
+      collection(db, "presencas"),
+      where("userId", "==", auth.currentUser.uid)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    document.getElementById("totalPresencas").innerText =
+      "Total de participações: " + querySnapshot.size;
+  }
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      document.getElementById("loginArea").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      carregarRegistros();
+      carregarPresencas();
+    } else {
+      document.getElementById("loginArea").style.display = "block";
+      document.getElementById("app").style.display = "none";
+    }
+  });
+</script>
+
+</body>
+</html>
